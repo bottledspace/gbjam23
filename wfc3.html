@@ -11,7 +11,7 @@
     width: 16px;
     height: 16px;
     background-image: url(./tileset1.png);
-    background-position-x: calc(var(--index)*16px);
+    background-position-x: calc(var(--index)*-16px);
 }
 
 input[type=checkbox] {
@@ -24,7 +24,7 @@ input[type=checkbox] + label {
     height: 16px;
     margin:24px;
     background-image: url(./tileset1.png);
-    background-position-x: calc(var(--index)*16px);
+    background-position-x: calc(var(--index)*-16px);
     border-bottom-style: solid;
     border-bottom-width: 2px;
     border-bottom-color: #fff;
@@ -45,7 +45,7 @@ input[type=radio] + label {
     height: 16px;
     margin:24px;
     background-image: url(./tileset1.png);
-    background-position-x: calc(var(--index)*16px);
+    background-position-x: calc(var(--index)*-16px);
     border-bottom-style: solid;
     border-bottom-width: 2px;
     border-bottom-color: #fff;
@@ -67,7 +67,8 @@ input[type=radio]:checked + label {
 </form>
 
 <script>
-const ALL = (1<<4)-1;
+const numTiles = 14;
+const ALL = (1<<numTiles)-1;
 const _state = [];
 // We keep track of the relative time in which states are collapsed since this
 // is super useful for working out what happened when things go wrong.
@@ -80,7 +81,7 @@ let previousPanelIndex = 0;
 // Create the radio buttons which control which panel to show. Each button is a
 // tile from the palette.
 const whichPanel = document.getElementById("which-panel");
-for (let panelIndex = 0; panelIndex < 4; panelIndex++) {
+for (let panelIndex = 0; panelIndex < numTiles; panelIndex++) {
     const radiobutton = document.createElement("input");
     radiobutton.type = "radio";
     radiobutton.name = "which-panel";
@@ -120,17 +121,17 @@ for (let panelIndex = 0; panelIndex < 4; panelIndex++) {
 // and can only neighbor other tiles 1 to the right and left.
 const outputCode = document.getElementById("output-code");
 const panels = document.getElementById("panels");
-for (let panelIndex = 0; panelIndex < 4; panelIndex++) {
+for (let panelIndex = 0; panelIndex < numTiles; panelIndex++) {
     const panel = document.createElement("div");
     panel.id = `${panelIndex}-panel`;
     panel.style.display = (panelIndex==0)? "block":"none";
-    for (const direction of ["up","left","right","down"]) {
+    for (const direction of ["right","down"]) {
         const fieldset = document.createElement("fieldset");
         const label = document.createElement("label");
         label.innerText = direction;
         fieldset.appendChild(label);
 
-        for (let tileIndex = 0; tileIndex < 4; tileIndex++) {
+        for (let tileIndex = 0; tileIndex < numTiles; tileIndex++) {
             const checkbox = document.createElement("input");
             checkbox.type = "checkbox";
             checkbox.id = `${panelIndex}-${direction}-${tileIndex}`;
@@ -156,11 +157,11 @@ for (let panelIndex = 0; panelIndex < 4; panelIndex++) {
 // constraints to a form we can use.
 function produceConstraints() {
     let constraints = {};
-    for (const direction of ["up","left","right","down"]) {
+    for (const direction of ["right","down"]) {
         constraints[direction] = [];
-        for (let i = 0; i < 4; i++) {
+        for (let i = 0; i < numTiles; i++) {
             constraints[direction][i] = 0;
-            for (let j = 0; j < 4; j++) {
+            for (let j = 0; j < numTiles; j++) {
                 const checkbox = document.getElementById(`${i}-${direction}-${j}`);
                 if (checkbox.checked)
                     constraints[direction][i] |= (1<<j);
@@ -175,9 +176,9 @@ outputCode.value = JSON.stringify(_constraints);
 // This does the opposite of the above method, instead we are taking the JSON
 // and setting the GUI state to reflect it.
 function reproduceConstraints(constraints) {
-    for (const direction of ["up","left","right","down"]) {
-        for (let i = 0; i < 4; i++) {
-            for (let j = 0; j < 4; j++) {
+    for (const direction of ["right","down"]) {
+        for (let i = 0; i < numTiles; i++) {
+            for (let j = 0; j < numTiles; j++) {
                 const checkbox = document.getElementById(`${i}-${direction}-${j}`);
                 checkbox.checked = ((constraints[direction][i] & (1<<j)) != 0);
             }
@@ -187,6 +188,7 @@ function reproduceConstraints(constraints) {
 outputCode.addEventListener("change", (e) => {
     reproduceConstraints(JSON.parse(outputCode.value));
 });
+reproduceConstraints(_constraints = {"right":[533,5378,8328,533,2144,532,2144,8328,532,5378,2144,5378,8328,5378],"down":[141,3138,8720,4384,141,141,141,3138,4384,8720,4384,8720,3138,3138]});
 
 const width = 10;
 const height = 10;
@@ -232,71 +234,22 @@ function sync() {
     }
 }
 
-function neighbors(x,y) {
-    let pts = [];
-    if (state(x-1,y) != (1<<32)-1) pts.push([x-1,y]);
-    if (state(x+1,y) != (1<<32)-1) pts.push([x+1,y]);
-    if (state(x,y-1) != (1<<32)-1) pts.push([x,y-1]);
-    if (state(x,y+1) != (1<<32)-1) pts.push([x,y+1]);
-    return pts;
-}
-
-function choices(x,y) {
-    const res = [];
-    let S = state(x,y);
-    for (let s = 1; s < ALL; s <<= 1)
-        if (constraints[s](x,y))
-            res.push(s);
-    return res;
-}
-
-function entropy(x,y) {
-    let S = state(x,y);
-    let choices = 0;
-    for (let s = 1; s < ALL; s <<= 1)
-        if ((S & s) == s)
-            choices++;
-    return choices;
-}
-
 function assign(x,y,val,res) {
     const S_ = state(x,y) & val;
     if (S_ == 0)
-        return [];
+        return;
     const S = state(x,y,S_);
-    if ((S & ~val) != 0)
+    if ((S & ~val) != 0 && res !== undefined)
         res.push([x,y]);
-}
-function remove(x,y,val,res) {
-    const S_ = state(x,y) & ~val;
-    if (S_ == 0)
-        return [];
-    const S = state(x,y,S_);
-    if ((S & val) == 0)
-        res.push([x,y]);
-}
-
-function propagate(x,y) {
-    const res = [];
-    let S = state(x,y);
-    for (let i = 0; i < 30; i++)
-        if ((S&(1<<i)) != 0) {
-            
-            assign(x-1,y,_constraints["left"][i],res);
-            assign(x+1,y,_constraints["right"][i],res);
-            assign(x,y-1,_constraints["down"][i],res);
-            assign(x,y+1,_constraints["up"][i],res);
-        }
-    return res;
 }
 
 function collapse(x,y) {
     const choices = [];
     let S = state(x,y);
-    for (let s = 1; s < ALL; s <<= 1)
-        if ((S & s) != 0)
-            choices.push(s);
-    state(x,y,choices[Math.floor(choices.length*Math.random())]);
+    for (let i = 0; i < numTiles; i++)
+        if ((S & (1<<i)) != 0)
+            choices.push(i);
+    state(x,y,1<<choices[Math.floor(choices.length*Math.random())]);
 }
 
 function reset() {
@@ -307,51 +260,26 @@ function reset() {
     _resetme = false;
 }
 
-function update() {
+function update(x,y) {
     sync();
     if (_resetme)
         reset();
-
-    // Choose a tile with lowest entropy and collapse.
-    let lowestEntropy = Infinity;
-    let lowestPt = null;
-    for (let y = 0; y < height; y++)
-    for (let x = 0; x < width; x++) {
-        const e = entropy(x,y);
-        if (e < lowestEntropy && e > 1) {
-            lowestEntropy = e;
-            lowestPt = [x,y];
-        }
-    }
-    if (!Number.isFinite(lowestEntropy))
+    if (y < 0)
         return;
-    let [x0,y0] = lowestPt;
-    collapse(x0,y0);
+    const a = (x-1<0)? ALL : _constraints["right"][Math.log2(state(x-1,y))];
+    const b = (y+1>=height)? ALL : _constraints["down"][Math.log2(state(x,y+1))];
 
-    // Propagate new information to all tiles.
-    const mask = new Set();
-    const pending = [[x0,y0]];
-    while (pending.length > 0) {
-        const [x,y] = pending.pop();
-        if (x<0 || x>=width || y<0 || y>=height)
-            continue;
-        if (mask.has(`${x},${y}`))
-            continue;
-        mask.add(`${x},${y}`);
+    state(x,y, a&b);
+    collapse(x,y);
 
-        for (const p2 of propagate(x,y)) {
-            pending.push(p2);
-        }
-    }
-
-    setTimeout(update, 0);
+    setTimeout(update, 0, (x+1)>=width?0:(x+1), (x+1)>=width?(y-1):y);
 }
-update();
+update(0,height-1);
 
 const rerollButton = document.getElementById("reroll");
 rerollButton.addEventListener("click", (e)=> {
     _resetme = true;
-    update();
+    update(0,height-1);
 });
 </script>
 
