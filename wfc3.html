@@ -170,8 +170,7 @@ function produceConstraints() {
     }
     return constraints;
 }
-let _constraints = produceConstraints();
-outputCode.value = JSON.stringify(_constraints);
+
 
 // This does the opposite of the above method, instead we are taking the JSON
 // and setting the GUI state to reflect it.
@@ -188,7 +187,9 @@ function reproduceConstraints(constraints) {
 outputCode.addEventListener("change", (e) => {
     reproduceConstraints(JSON.parse(outputCode.value));
 });
-reproduceConstraints(_constraints = {"right":[533,5378,8328,533,2144,532,2144,8328,532,5378,2144,5378,8328,5378],"down":[141,3138,8720,4384,141,141,141,3138,4384,8720,4384,8720,3138,3138]});
+let _constraints = {"right":[533,5378,8328,533,2144,532,2144,8328,532,5378,2144,5378,8328,5378],"down":[141,3138,8720,4384,141,141,141,3138,4384,8720,4384,8720,3138,3138]};
+outputCode.value = JSON.stringify(_constraints);
+reproduceConstraints(_constraints);
 
 const width = 10;
 const height = 10;
