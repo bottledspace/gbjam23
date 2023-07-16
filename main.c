@@ -6,7 +6,7 @@
 #include "bgtiles.h"
 #include "lsearch.h"
 
-const unsigned char tileset[] = {
+const uint8_t tileset[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00, 0xFF, 0x00,
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x03, 0x00, 0x07, 0x00, 0x0F, 0x00,
@@ -24,55 +24,49 @@ const unsigned char tileset[] = {
 };
 
 
-unsigned char cam_prevx = 0;
-unsigned char cam_prevy = 0;
-unsigned char cam_x = 0;
-unsigned char cam_y = 0;
+int8_t cam_x = 0;
+int8_t cam_y = 0;
 
-void scroll(char dx, char dy)
+void scroll(int8_t dx, int8_t dy)
 {
-    cam_prevx = cam_x;
-    cam_prevy = cam_y;
-    cam_x += dx;
-    cam_y += dy;
+    cam_x = (32+dx+cam_x)%32;
+    cam_y = (32+dy+cam_y)%32;
+    move_bkg(8ul*cam_x,8ul*cam_y);
 
-    if ((cam_prevx>>3) < (cam_x>>3)) {
-        unsigned ofs = (21+(cam_x>>3))%32;
-        for (unsigned i = 0; i < 32; i++) {
-            T[i*32+ofs] = rand()%5;
+    if (dx > 0) {
+        int8_t x = (19+cam_x)%32;
+        T_at(x,0) = TILE_NONE;
+        for (int8_t y = 0; y < 18; y++) {
+            lsearch(x,(cam_y+y)%32);
         }
-        set_bkg_submap(ofs,0,1,32,T,32);
-    } else if ((cam_prevx>>3) > (cam_x>>3)) {
-        unsigned ofs = (31+(cam_x>>3))%32;
-        for (unsigned i = 0; i < 32; i++) {
-            T[i*32+ofs] = rand()%5;
+        set_bkg_submap(x,0,1,32,T,32);
+    } else if (dx < 0) {
+        int8_t x = cam_x%32;
+        for (int8_t y = 17; y >= 0; y--) {
+            lsearch2(x,(cam_y+y)%32);
         }
-        set_bkg_submap(ofs,0,1,32,T,32);
+        set_bkg_submap(x,0,1,32,T,32);
     }
-
-    if ((cam_prevy>>3) < (cam_y>>3)) {
-        unsigned ofs = (19+(cam_y>>3))%32;
-        for (unsigned i = 0; i < 32; i++) {
-            T[ofs*32+i] = rand()%5;
+ 
+    if (dy > 0) {
+        int8_t y = (17+cam_y)%32;
+        for (int8_t x = 0; x < 20; x++) {
+            lsearch((cam_x+x)%32,y);
         }
-        set_bkg_submap(0,ofs,32,1,T,32);
-    } else if ((cam_prevy>>3) > (cam_y>>3)) {
-        unsigned ofs = (31+(cam_y>>3))%32;
-        for (unsigned i = 0; i < 32; i++) {
-            T[ofs*32+i] = rand()%5;
+        set_bkg_submap(0,y,32,1,T,32);
+    } else if (dy < 0) {
+        int8_t y = cam_y%32;
+        for (int8_t x = 19; x >= 0; x--) {
+            lsearch2((cam_x+x)%32,y);
         }
-        set_bkg_submap(0,ofs,32,1,T,32);
+        set_bkg_submap(0,y,32,1,T,32);
     }
-    move_bkg(cam_x,cam_y);
 }
 
 void main(void)
 {
-    uint8_t i;
-    for (i = 0; i < T_width; i++)
-        T_at(i,-1) = TILE_NONE;
-
-    lsearch();
+    lsearch_init();
+    memset(T, TILE_NONE, T_width*T_height);
 
     DISPLAY_ON;
     SHOW_BKG;
@@ -80,7 +74,7 @@ void main(void)
     set_bkg_data(0,numTiles-1,tileset);
     set_bkg_tiles(0,0,T_width,T_height,&T_at(0,0));
     for (;;) {
-        //scroll(1,1);
-        //wait_vbl_done();
+        scroll(-1,0);
+        wait_vbl_done();
     }
 }

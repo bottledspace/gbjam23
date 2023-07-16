@@ -13,10 +13,13 @@ unsigned rand()
 #define T_height 32
 
 #define TILE_NONE 14
+#define T_at(x,y) T[((uint16_t)T_width)*(y)+(x)]
 
-uint8_t T[T_width*(T_height+1)];
-uint32_t D[numTiles] = {141,3138,8720,4384,141,141,141,3138,4384,8720,4384,8720,3138,3138,(1<<(numTiles))-1};
-uint32_t R[numTiles] = {533,5378,8328,533,2144,532,2144,8328,532,5378,2144,5378,8328,5378,(1<<(numTiles))-1};
+uint8_t T[T_width*T_height];
+uint16_t D[numTiles] = {141,3138,8720,4384,141,141,141,3138,4384,8720,4384,8720,3138,3138,(1<<TILE_NONE)-1};
+uint16_t R[numTiles] = {533,5378,8328,533,2144,532,2144,8328,532,5378,2144,5378,8328,5378,(1<<TILE_NONE)-1};
+uint16_t U[numTiles];
+uint16_t L[numTiles];
 
 uint8_t rolls[numTiles-1][100] = {
     {0, 1, 0, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1, 1, 0, 1, 0, 0, 1, 0, 0, 0, 0, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1},
@@ -35,36 +38,94 @@ uint8_t rolls[numTiles-1][100] = {
     {9, 5, 4, 6, 14, 3, 14, 11, 7, 10, 4, 12, 1, 6, 1, 0, 12, 2, 13, 12, 12, 4, 8, 5, 14, 9, 7, 5, 10, 8, 4, 8, 9, 13, 11, 9, 3, 11, 9, 1, 0, 7, 1, 12, 0, 5, 4, 10, 8, 10, 7, 0, 10, 8, 7, 12, 9, 1, 11, 8, 8, 10, 1, 6, 10, 4, 6, 1, 7, 5, 3, 11, 7, 4, 0, 7, 2, 8, 0, 14, 3, 6, 10, 3, 2, 5, 10, 9, 1, 2, 13, 6, 6, 14, 2, 9, 2, 9, 1, 4}
 };
 
-#define T_at(x,y) T[((y)+1)*T_width+(x)]
-#define D_at(a,b) ((D[a]&(1<<(b))) != 0)
-#define R_at(a,b) ((R[a]&(1<<(b))) != 0)
-
-void lsearch()
+static const unsigned char BitsSetTable256[256] = 
 {
+#   define B2(n) n,     n+1,     n+1,     n+2
+#   define B4(n) B2(n), B2(n+1), B2(n+1), B2(n+2)
+#   define B6(n) B4(n), B4(n+1), B4(n+1), B4(n+2)
+    B6(0), B6(1), B6(1), B6(2)
+};
+
+uint8_t lsearch(int8_t x, int8_t y)
+{
+    uint8_t above = T_at(x,(y+31)%32);
+    uint8_t left = T_at((x+31)%32,y);
+
+    uint16_t possible = D[above] & R[left];
+    uint8_t count = BitsSetTable256[(possible>>8)&0xff]
+                  + BitsSetTable256[possible&0xff];
+    if (count < 2)
+        count = 0;
+    else
+        count = rolls[count-2][seed = ((seed+1)%100)];
+
+    uint8_t k = 0;
+    while (k < numTiles) {
+        if (possible & 1) {
+            if (count == 0)
+                return T_at(x,y) = k;
+            count--;
+        }
+        possible >>= 1;
+        k++;
+    }
+    return TILE_NONE;
+}
+
+uint8_t lsearch2(int8_t x, int8_t y)
+{
+    uint8_t below = T_at(x,(y+1)%32);
+    uint8_t right = T_at((x+1)%32,y);
+
+    uint16_t possible = U[below] & L[right];
+    uint8_t count = BitsSetTable256[(possible>>8)&0xff]
+                  + BitsSetTable256[possible&0xff];
+    if (count < 2)
+        count = 0;
+    else
+        count = rolls[count-2][seed = ((seed+1)%100)];
+
+    uint8_t k = 0;
+    for (;;) {
+        if (possible & 1) {
+            if (count == 0)
+                return T_at(x,y) = k;
+            count--;
+        }
+        possible >>= 1;
+        k++;
+    }
+    return TILE_NONE;
+}
+
+void lsearch_init(void)
+{
+    // Transpose the two matrices
+    uint8_t i,j;
+    uint16_t bit2, bit = 1;
+    for (i = 0; i < TILE_NONE; i++) {
+        bit2 = 1;
+        for (j = 0; j < TILE_NONE; j++) {
+            if (D[i] & bit2) U[j] |= bit;
+            if (R[i] & bit2) L[j] |= bit;
+            bit2 <<= 1;
+        }
+        bit <<= 1;
+    }
+    U[TILE_NONE] = L[TILE_NONE] = (1ul<<TILE_NONE)-1;
+}
+
+/*
+void lsearch_all()
+{
+    int8_t x,y;
     uint8_t left, above;
-    uint8_t seed = 0;
-    int8_t count;
-    int8_t x,y,k;
 
     for (y = 0; y < T_height; y++) {
         left = TILE_NONE;
         for (x = 0; x < T_width; x++) {
             above = T_at(x,y-1);
-
-            // First we count the number of possible tiles.
-            count = 0;
-            for (k = 0; k < numTiles; k++)
-                count += D_at(above,k) && R_at(left,k);
-
-            // Now we pick randomly from these tiles and count down until we
-            // reach zero, at which point we have found the tile we chose.
-            count = (count == 1)? 0 : rolls[count-2][rand()%100];
-            for (k = 0; k < numTiles; k++)
-                if (D_at(above,k) && R_at(left,k))
-                    if (count-- == 0)
-                        break;
-            
-            left = T_at(x,y) = k;
+            left = lsearch(x,y,above,left);
         }
     }
-}
+}*/
