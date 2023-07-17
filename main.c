@@ -35,16 +35,18 @@ void scroll(int8_t dx, int8_t dy)
 
     if (dx > 0) {
         int8_t x = (19+cam_x)%32;
-        T_at(x,0) = TILE_NONE;
         for (int8_t y = 0; y < 18; y++) {
             lsearch(x,(cam_y+y)%32);
         }
+        wait_vbl_done();
         set_bkg_submap(x,0,1,32,T,32);
     } else if (dx < 0) {
-        int8_t x = cam_x%32;
+        T_set(cam_x,(cam_y+18)%32,TILE_NONE);
+        int8_t x = cam_x;
         for (int8_t y = 17; y >= 0; y--) {
             lsearch2(x,(cam_y+y)%32);
         }
+        wait_vbl_done();
         set_bkg_submap(x,0,1,32,T,32);
     }
  
@@ -53,19 +55,21 @@ void scroll(int8_t dx, int8_t dy)
         for (int8_t x = 0; x < 20; x++) {
             lsearch((cam_x+x)%32,y);
         }
+        wait_vbl_done();
         set_bkg_submap(0,y,32,1,T,32);
     } else if (dy < 0) {
-        int8_t y = cam_y%32;
+        T_set((cam_x+20)%32,cam_y,TILE_NONE);
+        int8_t y = cam_y;
         for (int8_t x = 19; x >= 0; x--) {
             lsearch2((cam_x+x)%32,y);
         }
+        wait_vbl_done();
         set_bkg_submap(0,y,32,1,T,32);
     }
 }
 
 void main(void)
 {
-    lsearch_init();
     memset(T, TILE_NONE, T_width*T_height);
 
     DISPLAY_ON;
@@ -74,7 +78,8 @@ void main(void)
     set_bkg_data(0,numTiles-1,tileset);
     set_bkg_tiles(0,0,T_width,T_height,&T_at(0,0));
     for (;;) {
-        scroll(-1,0);
-        wait_vbl_done();
+        scroll(-1,-1);
+        for(int i = 0; i < 100; i++)
+            wait_vbl_done();
     }
 }
